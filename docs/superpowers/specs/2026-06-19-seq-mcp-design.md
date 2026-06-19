@@ -152,6 +152,13 @@ All three tools were exercised through the MCP handshake against live production
 `seq_query` (user's `group by @MessageTemplate,ExceptionType` aggregate), `recent_errors`
 (capped at 20 events to stay terse), and `search_events` (filter + count honoured).
 
+## Added after initial release (v0.1.4)
+
+- **Clear config error messages.** All HTTP calls route through one `send` helper in
+  `SeqClient`. A 401/403 names `SEQ__APIKEY` (distinguishing "not set" from "set but rejected");
+  a connection failure names `SEQ__SERVERURL` and the URL it tried. No more bare socket/HTTP
+  errors leaking to the user.
+
 ## Added after initial release (v0.1.3)
 
 - **stdio transport.** `seq-mcp --stdio` runs the server over stdin/stdout via

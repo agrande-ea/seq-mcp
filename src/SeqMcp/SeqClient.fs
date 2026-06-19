@@ -15,6 +15,47 @@ type SeqClient(http: HttpClient) =
     static let isoUtc (t: DateTime) =
         t.ToUniversalTime().ToString("o")
 
+    let serverUrl () =
+        if isNull http.BaseAddress then
+            "(no server URL — set SEQ__SERVERURL)"
+        else
+            string http.BaseAddress
+
+    /// Issue a GET and return the body, turning transport/HTTP failures into clear,
+    /// actionable messages that name the relevant SEQ__ setting.
+    let send (url: string) : Task<string> =
+        task {
+            try
+                use! resp = http.GetAsync url
+                let! body = resp.Content.ReadAsStringAsync()
+
+                if resp.IsSuccessStatusCode then
+                    return body
+                else
+                    match int resp.StatusCode with
+                    | 401
+                    | 403 ->
+                        let hint =
+                            if http.DefaultRequestHeaders.Contains "X-Seq-ApiKey" then
+                                "The SEQ__APIKEY is set but was rejected — check the key is valid and has read permission."
+                            else
+                                "No API key is configured — set the SEQ__APIKEY environment variable (this Seq server requires authentication)."
+
+                        return
+                            failwithf
+                                "Seq at %s returned %d (unauthorized). %s"
+                                (serverUrl ())
+                                (int resp.StatusCode)
+                                hint
+                    | code -> return failwithf "Seq at %s returned %d: %s" (serverUrl ()) code (body.Trim())
+            with :? HttpRequestException as ex ->
+                return
+                    failwithf
+                        "Could not reach Seq at %s — check the SEQ__SERVERURL environment variable and that the server is running. (%s)"
+                        (serverUrl ())
+                        ex.Message
+        }
+
     /// Run a Seq SQL query over an optional [rangeStartUtc, rangeEndUtc) window,
     /// optionally scoped to a saved signal.
     member _.QueryAsync
@@ -38,14 +79,8 @@ type SeqClient(http: HttpClient) =
                   | None -> () ]
 
             let url = "api/data?" + String.Join("&", parts)
-
-            use! resp = http.GetAsync url
-            let! body = resp.Content.ReadAsStringAsync()
-
-            if not resp.IsSuccessStatusCode then
-                return failwithf "Seq returned %d: %s" (int resp.StatusCode) (body.Trim())
-            else
-                return JsonSerializer.Deserialize<QueryResult>(body, jsonOptions)
+            let! body = send url
+            return JsonSerializer.Deserialize<QueryResult>(body, jsonOptions)
         }
 
     /// List rendered events matching a Seq filter expression, newest first, over an
@@ -75,37 +110,21 @@ type SeqClient(http: HttpClient) =
                   | None -> () ]
 
             let url = "api/events?" + String.Join("&", parts)
-
-            use! resp = http.GetAsync url
-            let! body = resp.Content.ReadAsStringAsync()
-
-            if not resp.IsSuccessStatusCode then
-                return failwithf "Seq returned %d: %s" (int resp.StatusCode) (body.Trim())
-            else
-                return JsonSerializer.Deserialize<SeqEvent[]>(body, jsonOptions)
+            let! body = send url
+            return JsonSerializer.Deserialize<SeqEvent[]>(body, jsonOptions)
         }
 
     /// Fetch a single event by id, with rendered message and full detail.
     member _.GetEventAsync(id: string) : Task<SeqEvent> =
         task {
             let url = "api/events/" + Uri.EscapeDataString id + "?render=true"
-            use! resp = http.GetAsync url
-            let! body = resp.Content.ReadAsStringAsync()
-
-            if not resp.IsSuccessStatusCode then
-                return failwithf "Seq returned %d: %s" (int resp.StatusCode) (body.Trim())
-            else
-                return JsonSerializer.Deserialize<SeqEvent>(body, jsonOptions)
+            let! body = send url
+            return JsonSerializer.Deserialize<SeqEvent>(body, jsonOptions)
         }
 
     /// List saved signals (shared and personal).
     member _.ListSignalsAsync() : Task<Signal[]> =
         task {
-            use! resp = http.GetAsync "api/signals?shared=true"
-            let! body = resp.Content.ReadAsStringAsync()
-
-            if not resp.IsSuccessStatusCode then
-                return failwithf "Seq returned %d: %s" (int resp.StatusCode) (body.Trim())
-            else
-                return JsonSerializer.Deserialize<Signal[]>(body, jsonOptions)
+            let! body = send "api/signals?shared=true"
+            return JsonSerializer.Deserialize<Signal[]>(body, jsonOptions)
         }
