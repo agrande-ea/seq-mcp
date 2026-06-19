@@ -152,9 +152,18 @@ All three tools were exercised through the MCP handshake against live production
 `seq_query` (user's `group by @MessageTemplate,ExceptionType` aggregate), `recent_errors`
 (capped at 20 events to stay terse), and `search_events` (filter + count honoured).
 
+## Added after initial release (v0.1.2)
+
+- `get_event(id)` — full single-event detail (exception/stack trace + properties) via
+  `GET /api/events/{id}?render=true`. The list tools now lead each line with the event `Id`
+  so it can be passed in.
+- `list_signals(nameFilter?)` — saved signals (`Id · Title`) via `GET /api/signals?shared=true`.
+- Optional `signal` parameter on `seq_query` and `search_events` (the `signal=` query param),
+  scoping to a saved signal id.
+
 ## Out of scope (YAGNI)
 
-- `list_signals` / saved-signal management.
+- `active_alerts` / alert-state (considered; deferred — needs more endpoint work).
 - Live tail / streaming.
 - Writing/ingesting events.
 - `seqcli` subprocess backend (kept clean so it *could* be swapped later, but not built).

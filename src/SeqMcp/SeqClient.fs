@@ -15,16 +15,21 @@ type SeqClient(http: HttpClient) =
     static let isoUtc (t: DateTime) =
         t.ToUniversalTime().ToString("o")
 
-    /// Run a Seq SQL query over an optional [rangeStartUtc, rangeEndUtc) window.
+    /// Run a Seq SQL query over an optional [rangeStartUtc, rangeEndUtc) window,
+    /// optionally scoped to a saved signal.
     member _.QueryAsync
         (
             sql: string,
+            signal: string option,
             rangeStartUtc: DateTime option,
             rangeEndUtc: DateTime option
         ) : Task<QueryResult> =
         task {
             let parts =
                 [ yield "q=" + Uri.EscapeDataString sql
+                  match signal with
+                  | Some s when not (String.IsNullOrWhiteSpace s) -> yield "signal=" + Uri.EscapeDataString s
+                  | _ -> ()
                   match rangeStartUtc with
                   | Some t -> yield "rangeStartUtc=" + Uri.EscapeDataString(isoUtc t)
                   | None -> ()
@@ -49,6 +54,7 @@ type SeqClient(http: HttpClient) =
         (
             filter: string,
             count: int,
+            signal: string option,
             fromUtc: DateTime option,
             toUtc: DateTime option
         ) : Task<SeqEvent[]> =
@@ -56,6 +62,9 @@ type SeqClient(http: HttpClient) =
             let parts =
                 [ if not (String.IsNullOrWhiteSpace filter) then
                       yield "filter=" + Uri.EscapeDataString filter
+                  match signal with
+                  | Some s when not (String.IsNullOrWhiteSpace s) -> yield "signal=" + Uri.EscapeDataString s
+                  | _ -> ()
                   yield "count=" + string count
                   yield "render=true"
                   match fromUtc with
@@ -74,4 +83,29 @@ type SeqClient(http: HttpClient) =
                 return failwithf "Seq returned %d: %s" (int resp.StatusCode) (body.Trim())
             else
                 return JsonSerializer.Deserialize<SeqEvent[]>(body, jsonOptions)
+        }
+
+    /// Fetch a single event by id, with rendered message and full detail.
+    member _.GetEventAsync(id: string) : Task<SeqEvent> =
+        task {
+            let url = "api/events/" + Uri.EscapeDataString id + "?render=true"
+            use! resp = http.GetAsync url
+            let! body = resp.Content.ReadAsStringAsync()
+
+            if not resp.IsSuccessStatusCode then
+                return failwithf "Seq returned %d: %s" (int resp.StatusCode) (body.Trim())
+            else
+                return JsonSerializer.Deserialize<SeqEvent>(body, jsonOptions)
+        }
+
+    /// List saved signals (shared and personal).
+    member _.ListSignalsAsync() : Task<Signal[]> =
+        task {
+            use! resp = http.GetAsync "api/signals?shared=true"
+            let! body = resp.Content.ReadAsStringAsync()
+
+            if not resp.IsSuccessStatusCode then
+                return failwithf "Seq returned %d: %s" (int resp.StatusCode) (body.Trim())
+            else
+                return JsonSerializer.Deserialize<Signal[]>(body, jsonOptions)
         }

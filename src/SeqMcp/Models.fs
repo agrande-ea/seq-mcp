@@ -25,14 +25,43 @@ type QueryResult =
       [<JsonPropertyName("Reasons")>]
       Reasons: string[] }
 
-/// A single rendered event from GET /api/events (render=true).
-/// Level is omitted by Seq for Information-level events.
+/// A single property attached to an event (Name = Value).
+type EventProperty =
+    { [<JsonPropertyName("Name")>]
+      Name: string
+
+      [<JsonPropertyName("Value")>]
+      Value: JsonElement }
+
+/// A rendered event from GET /api/events (render=true) or /api/events/{id}.
+/// Level is omitted by Seq for Information-level events; Exception/Properties
+/// are populated for the single-event detail view.
 type SeqEvent =
-    { [<JsonPropertyName("Timestamp")>]
+    { [<JsonPropertyName("Id")>]
+      Id: string
+
+      [<JsonPropertyName("Timestamp")>]
       Timestamp: string
 
       [<JsonPropertyName("Level")>]
       Level: string
 
       [<JsonPropertyName("RenderedMessage")>]
-      RenderedMessage: string }
+      RenderedMessage: string
+
+      [<JsonPropertyName("Exception")>]
+      Exception: string
+
+      [<JsonPropertyName("Properties")>]
+      Properties: EventProperty[] }
+
+/// A saved Seq signal (a named, reusable filter) from GET /api/signals.
+type Signal =
+    { [<JsonPropertyName("Id")>]
+      Id: string
+
+      [<JsonPropertyName("Title")>]
+      Title: string
+
+      [<JsonPropertyName("Description")>]
+      Description: string }
