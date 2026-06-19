@@ -49,6 +49,32 @@ module private Render =
         else
             table r.Columns r.Rows
 
+    let private maxMessageLength = 300
+
+    /// Render events as terse `Timestamp · Level · Message` lines, newest first.
+    let events (es: SeqEvent[]) =
+        if isNull (box es) || es.Length = 0 then
+            "No events."
+        else
+            es
+            |> Array.map (fun e ->
+                let level =
+                    if String.IsNullOrWhiteSpace e.Level then "Information" else e.Level
+
+                let msg =
+                    match e.RenderedMessage with
+                    | null -> ""
+                    | m ->
+                        let oneLine = m.Replace("\r", " ").Replace("\n", " ").Trim()
+
+                        if oneLine.Length > maxMessageLength then
+                            oneLine.Substring(0, maxMessageLength) + "…"
+                        else
+                            oneLine
+
+                sprintf "%s · %s · %s" e.Timestamp level msg)
+            |> String.concat "\n"
+
 [<McpServerToolType>]
 type SeqTools(client: SeqClient) =
 
@@ -91,7 +117,7 @@ type SeqTools(client: SeqClient) =
                 return Render.result r
             })
 
-    [<McpServerTool; Description("List recent Error and Fatal events. Returns compact Time · Level · Message lines, newest first. Defaults to the last 30 minutes.")>]
+    [<McpServerTool; Description("List the most recent Error and Fatal events (up to 20). Returns compact Time · Level · Message lines, newest first. Defaults to the last 30 minutes.")>]
     member _.RecentErrors
         (
             [<Description("Look-back window in minutes. Defaults to 30."); Optional; DefaultParameterValue(30)>] minutes: int
@@ -101,13 +127,15 @@ type SeqTools(client: SeqClient) =
                 let minutes = if minutes <= 0 then 30 else minutes
                 let rangeStart = DateTime.UtcNow.AddMinutes(float -minutes)
 
-                let sql =
-                    "select @Timestamp as Time, @Level as Level, @Message as Message "
-                    + "from stream where @Level in ('Error', 'Fatal') "
-                    + "order by Time desc limit 100"
+                let! events =
+                    client.EventsAsync(
+                        "@Level = 'Error' or @Level = 'Fatal'",
+                        20,
+                        Some rangeStart,
+                        Some DateTime.UtcNow
+                    )
 
-                let! r = client.QueryAsync(sql, Some rangeStart, Some DateTime.UtcNow)
-                return Render.result r
+                return Render.events events
             })
 
     [<McpServerTool; Description("Search log events with a Seq filter expression (e.g. \"@Exception like '%timeout%'\" or \"StatusCode = 500\"). Returns compact Time · Level · Message lines, newest first. Time window defaults to the last 24 hours.")>]
@@ -119,17 +147,7 @@ type SeqTools(client: SeqClient) =
         run (fun () ->
             task {
                 let count = if count <= 0 || count > 100 then 30 else count
-
-                let whereClause =
-                    if String.IsNullOrWhiteSpace filter then "" else sprintf "where %s " filter
-
-                let sql =
-                    sprintf
-                        "select @Timestamp as Time, @Level as Level, @Message as Message from stream %sorder by Time desc limit %d"
-                        whereClause
-                        count
-
                 let rangeStart = DateTime.UtcNow.AddHours(-24.0)
-                let! r = client.QueryAsync(sql, Some rangeStart, Some DateTime.UtcNow)
-                return Render.result r
+                let! events = client.EventsAsync(filter, count, Some rangeStart, Some DateTime.UtcNow)
+                return Render.events events
             })

@@ -3,7 +3,7 @@ namespace SeqMcp
 open System.Text.Json
 open System.Text.Json.Serialization
 
-/// Result of GET /api/data/query.
+/// Result of GET /api/data.
 /// Only one of Rows / Slices / Series is populated for a given result set;
 /// this server renders the tabular Rows shape (the one produced by plain
 /// selects and `group by <expr>` aggregates).
@@ -24,3 +24,15 @@ type QueryResult =
 
       [<JsonPropertyName("Reasons")>]
       Reasons: string[] }
+
+/// A single rendered event from GET /api/events (render=true).
+/// Level is omitted by Seq for Information-level events.
+type SeqEvent =
+    { [<JsonPropertyName("Timestamp")>]
+      Timestamp: string
+
+      [<JsonPropertyName("Level")>]
+      Level: string
+
+      [<JsonPropertyName("RenderedMessage")>]
+      RenderedMessage: string }

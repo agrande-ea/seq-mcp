@@ -128,24 +128,29 @@ Required setup outside the repo:
 3. A missing/unreachable Seq makes tool calls return `isError` gracefully rather than crash —
    so the handshake + tool advertisement can be verified without a live Seq.
 
-## API facts (verified against Datalust's Seq.Api client source)
+## API facts (verified against a live Seq, seq.eventsair.com)
 
-- Query endpoint: `GET /api/data/query?q=<sql>&rangeStartUtc=<iso>&rangeEndUtc=<iso>`
-  (NOT `from`/`to` as originally guessed). Optional `timeoutMS`, `trace`.
-- Response `QueryResult`: `Columns: string[]`, `Rows: object[][]` (tabular — used here),
-  mutually exclusive `Slices`/`Series` for time-grouped queries, plus `Error`/`Reasons`.
+The API root (`GET /api`) is hypermedia; link templates were read from there.
+
+- **Aggregate/SQL query** (`seq_query`): `GET /api/data{?q,signal,rangeStartUtc,rangeEndUtc,format,timeoutMS,trace}`.
+  Path is `/api/data` (NOT `/api/data/query` — that older path requires a signal id and returns
+  `400 "A valid signal id is required."`). Response `QueryResult`: `Columns: string[]`,
+  `Rows: object[][]`, plus `Error`/`Reasons`. `@Timestamp` comes back as raw .NET ticks here,
+  so this endpoint is used only for aggregates, not event listing.
+- **Event listing** (`recent_errors`, `search_events`): `GET /api/events{?filter,count,fromDateUtc,toDateUtc,render,…}`
+  with `render=true`. Returns a JSON array of events (newest first) with `Timestamp` (ISO 8601),
+  `Level` (omitted for Information), and `RenderedMessage`. This is the right tool for listing.
 - Auth header: `X-Seq-ApiKey: <key>`.
 
-Design refinement applied: all three tools route through this single query endpoint.
-`recent_errors` and `search_events` are parameterized `select … from stream` queries, so there
-is one verified HTTP surface instead of a separate events endpoint.
+Seq query-language gotchas found by live testing: `order by Time` collides with the reserved
+`time` ordering keyword (only valid with `group by time()`); the `in ('a','b')` list operator is
+rejected — use `x = 'a' or x = 'b'`. These are why the convenience tools moved to `/api/events`.
 
-### Still unverified (no live Seq was available)
+### Verified end-to-end
 
-The exact SQL grammar accepted at runtime is untested against a live server — specifically the
-`recent_errors`/`search_events` query shape (`order by Time desc`, `@Level in ('Error','Fatal')`,
-aliasing `@Timestamp as Time`). The endpoint, params, and response shape are confirmed; the SQL
-text should be smoke-tested against a real Seq instance.
+All three tools were exercised through the MCP handshake against live production data:
+`seq_query` (user's `group by @MessageTemplate,ExceptionType` aggregate), `recent_errors`
+(capped at 20 events to stay terse), and `search_events` (filter + count honoured).
 
 ## Out of scope (YAGNI)
 
