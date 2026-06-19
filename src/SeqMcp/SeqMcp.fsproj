@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+
+    <!-- Web SDK disables packaging by default; re-enable to ship as a global tool. -->
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>seq-mcp</ToolCommandName>
+    <PackageId>SeqMcp</PackageId>
+    <Version>0.1.0</Version>
+    <RollForward>Major</RollForward>
+
+    <Authors>Daniel Little</Authors>
+    <Description>MCP server for querying a Seq structured-log server with Seq SQL (group by / aggregates), recent errors, and event search.</Description>
+    <PackageTags>mcp;seq;logging;datalust</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/daniellittledev/seq-mcp</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <!-- F# compile order matters: Models -> Client -> Tools -> Program. -->
+  <ItemGroup>
+    <Compile Include="Models.fs" />
+    <Compile Include="SeqClient.fs" />
+    <Compile Include="Tools.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.4.0" />
+  </ItemGroup>
+
+</Project>

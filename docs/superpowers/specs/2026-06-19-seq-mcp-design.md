@@ -128,15 +128,24 @@ Required setup outside the repo:
 3. A missing/unreachable Seq makes tool calls return `isError` gracefully rather than crash —
    so the handshake + tool advertisement can be verified without a live Seq.
 
-## Open items to verify against a live Seq during implementation
+## API facts (verified against Datalust's Seq.Api client source)
 
-The published Seq docs do not pin these down; confirm before finalizing `SeqClient`:
+- Query endpoint: `GET /api/data/query?q=<sql>&rangeStartUtc=<iso>&rangeEndUtc=<iso>`
+  (NOT `from`/`to` as originally guessed). Optional `timeoutMS`, `trace`.
+- Response `QueryResult`: `Columns: string[]`, `Rows: object[][]` (tabular — used here),
+  mutually exclusive `Slices`/`Series` for time-grouped queries, plus `Error`/`Reasons`.
+- Auth header: `X-Seq-ApiKey: <key>`.
 
-- Exact SQL query endpoint path and params — expected `GET /api/data/query?q=<sql>&from=<iso>&to=<iso>`.
-- Query JSON response shape — `Columns` / `Rows` vs `Slices` / `Total`.
-- Event search endpoint — expected `/api/events/signal` with `filter`, `count`, `render=true`,
-  and the level filter for `recent_errors`.
-- Confirmed: auth header is `X-Seq-ApiKey: <key>` (query-string `?apiKey=` also works).
+Design refinement applied: all three tools route through this single query endpoint.
+`recent_errors` and `search_events` are parameterized `select … from stream` queries, so there
+is one verified HTTP surface instead of a separate events endpoint.
+
+### Still unverified (no live Seq was available)
+
+The exact SQL grammar accepted at runtime is untested against a live server — specifically the
+`recent_errors`/`search_events` query shape (`order by Time desc`, `@Level in ('Error','Fatal')`,
+aliasing `@Timestamp as Time`). The endpoint, params, and response shape are confirmed; the SQL
+text should be smoke-tested against a real Seq instance.
 
 ## Out of scope (YAGNI)
 

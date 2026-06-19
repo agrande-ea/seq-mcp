@@ -1,0 +1,135 @@
+namespace SeqMcp
+
+open System
+open System.ComponentModel
+open System.Globalization
+open System.Runtime.InteropServices
+open System.Text
+open System.Text.Json
+open System.Threading.Tasks
+open ModelContextProtocol.Server
+
+/// Rendering helpers: turn Seq query results into terse plain text so the LLM
+/// spends minimal tokens. Never returns raw JSON.
+module private Render =
+
+    let maxRows = 100
+
+    let cell (e: JsonElement) =
+        match e.ValueKind with
+        | JsonValueKind.String -> e.GetString()
+        | JsonValueKind.Null
+        | JsonValueKind.Undefined -> ""
+        | _ -> e.GetRawText()
+
+    /// Render Columns + Rows as `a · b · c` lines with a header, capped.
+    let table (cols: string[]) (rows: JsonElement[][]) =
+        let cols = if isNull (box cols) then [||] else cols
+        let rows = if isNull (box rows) then [||] else rows
+        let sb = StringBuilder()
+
+        if cols.Length > 0 then
+            sb.AppendLine(String.Join(" · ", cols)) |> ignore
+
+        for row in Array.truncate maxRows rows do
+            sb.AppendLine(String.Join(" · ", Array.map cell row)) |> ignore
+
+        if rows.Length > maxRows then
+            sb.AppendLine(sprintf "… %d more rows (refine your query)" (rows.Length - maxRows))
+            |> ignore
+
+        if rows.Length = 0 then "No rows." else sb.ToString().TrimEnd()
+
+    /// Format a QueryResult, surfacing query errors and time-sliced results clearly.
+    let result (r: QueryResult) =
+        if not (String.IsNullOrWhiteSpace r.Error) then
+            sprintf "Query error: %s" (r.Error.Trim())
+        elif isNull (box r.Rows) && r.Slices.ValueKind = JsonValueKind.Array then
+            "Query returned time-sliced data (group by time(...)). Use a value grouping such as `group by @Level` for tabular output."
+        else
+            table r.Columns r.Rows
+
+[<McpServerToolType>]
+type SeqTools(client: SeqClient) =
+
+    let parseDate (s: string) =
+        if String.IsNullOrWhiteSpace s then
+            None
+        else
+            match
+                DateTime.TryParse(
+                    s,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal ||| DateTimeStyles.AdjustToUniversal
+                )
+            with
+            | true, dt -> Some dt
+            | _ -> None
+
+    let run (work: unit -> Task<string>) : Task<string> =
+        task {
+            try
+                return! work ()
+            with ex ->
+                return sprintf "Error: %s" ex.Message
+        }
+
+    [<McpServerTool; Description("Run a Seq SQL query and return compact tabular results. Supports aggregates and grouping, e.g. \"select count(*) as Count from stream group by @Level\". Time window defaults to the last 24 hours; pass ISO-8601 UTC 'from'/'to' to override. Results are capped at 100 rows.")>]
+    member _.SeqQuery
+        (
+            [<Description("Seq SQL query, e.g. 'select count(*) as Count from stream group by @Level'")>] sql: string,
+            [<Description("Optional ISO-8601 UTC start of the time window. Defaults to 24h ago."); Optional; DefaultParameterValue(null: string)>] from: string,
+            [<Description("Optional ISO-8601 UTC end of the time window. Defaults to now."); Optional; DefaultParameterValue(null: string)>] ``to``: string
+        ) : Task<string> =
+        run (fun () ->
+            task {
+                let rangeStart =
+                    parseDate from |> Option.defaultValue (DateTime.UtcNow.AddHours(-24.0))
+
+                let rangeEnd = parseDate ``to`` |> Option.defaultValue DateTime.UtcNow
+                let! r = client.QueryAsync(sql, Some rangeStart, Some rangeEnd)
+                return Render.result r
+            })
+
+    [<McpServerTool; Description("List recent Error and Fatal events. Returns compact Time · Level · Message lines, newest first. Defaults to the last 30 minutes.")>]
+    member _.RecentErrors
+        (
+            [<Description("Look-back window in minutes. Defaults to 30."); Optional; DefaultParameterValue(30)>] minutes: int
+        ) : Task<string> =
+        run (fun () ->
+            task {
+                let minutes = if minutes <= 0 then 30 else minutes
+                let rangeStart = DateTime.UtcNow.AddMinutes(float -minutes)
+
+                let sql =
+                    "select @Timestamp as Time, @Level as Level, @Message as Message "
+                    + "from stream where @Level in ('Error', 'Fatal') "
+                    + "order by Time desc limit 100"
+
+                let! r = client.QueryAsync(sql, Some rangeStart, Some DateTime.UtcNow)
+                return Render.result r
+            })
+
+    [<McpServerTool; Description("Search log events with a Seq filter expression (e.g. \"@Exception like '%timeout%'\" or \"StatusCode = 500\"). Returns compact Time · Level · Message lines, newest first. Time window defaults to the last 24 hours.")>]
+    member _.SearchEvents
+        (
+            [<Description("Seq filter expression, e.g. \"@Level = 'Warning' and Elapsed > 1000\"")>] filter: string,
+            [<Description("Maximum number of events to return. Defaults to 30."); Optional; DefaultParameterValue(30)>] count: int
+        ) : Task<string> =
+        run (fun () ->
+            task {
+                let count = if count <= 0 || count > 100 then 30 else count
+
+                let whereClause =
+                    if String.IsNullOrWhiteSpace filter then "" else sprintf "where %s " filter
+
+                let sql =
+                    sprintf
+                        "select @Timestamp as Time, @Level as Level, @Message as Message from stream %sorder by Time desc limit %d"
+                        whereClause
+                        count
+
+                let rangeStart = DateTime.UtcNow.AddHours(-24.0)
+                let! r = client.QueryAsync(sql, Some rangeStart, Some DateTime.UtcNow)
+                return Render.result r
+            })
