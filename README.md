@@ -21,8 +21,12 @@ raw JSON to keep token usage low.
 dotnet tool install -g SeqMcp
 ```
 
-This installs the `seq-mcp` command. It runs an HTTP MCP server on `http://localhost:5250`
-(override with `ASPNETCORE_URLS`).
+This installs the `seq-mcp` command, which supports two transports:
+
+- **stdio** (`seq-mcp --stdio`) — the MCP client launches and manages the process, speaking
+  JSON-RPC over stdin/stdout. Recommended for local single-user clients like Claude Code.
+- **HTTP** (`seq-mcp`) — a long-running Streamable HTTP server on `http://localhost:5250`
+  (override with `ASPNETCORE_URLS`) that clients connect to by URL.
 
 ## Configuration
 
@@ -35,7 +39,22 @@ The API key is sent as the `X-Seq-ApiKey` header. It is optional if your Seq ins
 anonymous read; when the key is missing or Seq is unreachable, tool calls return a graceful
 error message rather than failing the server.
 
-### Example MCP client config
+### Use with Claude Code
+
+stdio (recommended) — Claude launches and manages the process:
+
+```sh
+claude mcp add seq -e SEQ__SERVERURL=https://seq.example.com -e SEQ__APIKEY=your-api-key -- seq-mcp --stdio
+```
+
+HTTP — run the server yourself, then point Claude at the URL:
+
+```sh
+SEQ__SERVERURL=https://seq.example.com SEQ__APIKEY=your-api-key seq-mcp   # in one terminal
+claude mcp add --transport http seq http://localhost:5250
+```
+
+### Example MCP client config (HTTP)
 
 ```json
 {
@@ -46,12 +65,6 @@ error message rather than failing the server.
     }
   }
 }
-```
-
-Start the server with your environment set:
-
-```sh
-SEQ__SERVERURL=https://seq.example.com SEQ__APIKEY=your-api-key seq-mcp
 ```
 
 ## Build from source

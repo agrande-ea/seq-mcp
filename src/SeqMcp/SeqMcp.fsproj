@@ -8,7 +8,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>seq-mcp</ToolCommandName>
     <PackageId>SeqMcp</PackageId>
-    <Version>0.1.2</Version>
+    <Version>0.1.3</Version>
     <RollForward>Major</RollForward>
 
     <Authors>Daniel Little</Authors>

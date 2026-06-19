@@ -152,6 +152,15 @@ All three tools were exercised through the MCP handshake against live production
 `seq_query` (user's `group by @MessageTemplate,ExceptionType` aggregate), `recent_errors`
 (capped at 20 events to stay terse), and `search_events` (filter + count honoured).
 
+## Added after initial release (v0.1.3)
+
+- **stdio transport.** `seq-mcp --stdio` runs the server over stdin/stdout via
+  `Host.CreateApplicationBuilder` + `WithStdioServerTransport()`, with logs routed to stderr so
+  they don't corrupt the protocol stream. Lets a local client (Claude Code) launch and manage
+  the process: `claude mcp add seq -e SEQ__SERVERURL=… -e SEQ__APIKEY=… -- seq-mcp --stdio`.
+  Without the flag the server still runs over HTTP on :5250. DI/tool registration is shared
+  between both hosts.
+
 ## Added after initial release (v0.1.2)
 
 - `get_event(id)` — full single-event detail (exception/stack trace + properties) via
