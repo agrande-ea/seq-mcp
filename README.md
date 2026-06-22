@@ -21,12 +21,33 @@ raw JSON to keep token usage low.
 dotnet tool install -g SeqMcp
 ```
 
-This installs the `seq-mcp` command, which supports two transports:
+This installs the `seq-mcp` command, which runs in one of three modes:
 
+- **CLI** (`seq-mcp <command>`, the default with no flags) — run a single query from a shell,
+  script, or agent and print plain text. See [CLI](#cli) below.
 - **stdio** (`seq-mcp --stdio`) — the MCP client launches and manages the process, speaking
   JSON-RPC over stdin/stdout. Recommended for local single-user clients like Claude Code.
-- **HTTP** (`seq-mcp`) — a long-running Streamable HTTP server on `http://localhost:5250`
-  (override with `ASPNETCORE_URLS`) that clients connect to by URL.
+- **HTTP** (`seq-mcp --http`) — a long-running Streamable HTTP server on `http://localhost:5250`
+  (override with `ASPNETCORE_URLS`) that clients connect to by URL. Use for Claude Desktop and
+  other clients that connect by URL.
+
+## CLI
+
+The same capabilities are available as shell commands over the same core code, so behaviour and
+defaults match the MCP tools exactly. Run `seq-mcp --help` to list them, or `seq-mcp commands`
+for a machine-readable JSON description of every command, argument, and option (the CLI analogue
+of MCP's `tools/list` — point an agent at this to discover the surface in one call).
+
+```sh
+seq-mcp query "select count(*) as Count from stream group by @Level"
+seq-mcp errors --minutes 30
+seq-mcp search "@Exception like '%timeout%'" --count 30
+seq-mcp event event-abc123
+seq-mcp signals --filter checkout
+```
+
+Output goes to stdout; errors go to stderr with a non-zero exit code. Configure the server with
+the same `SEQ__SERVERURL` / `SEQ__APIKEY` environment variables (see [Configuration](#configuration)).
 
 ## Configuration
 
@@ -50,7 +71,7 @@ claude mcp add seq -e SEQ__SERVERURL=https://seq.example.com -e SEQ__APIKEY=your
 HTTP — run the server yourself, then point Claude at the URL:
 
 ```sh
-SEQ__SERVERURL=https://seq.example.com SEQ__APIKEY=your-api-key seq-mcp   # in one terminal
+SEQ__SERVERURL=https://seq.example.com SEQ__APIKEY=your-api-key seq-mcp --http   # in one terminal
 claude mcp add --transport http seq http://localhost:5250
 ```
 
@@ -98,7 +119,9 @@ This publishes the self-contained executable and writes `dist/seq-mcp.mcpb`. Pus
 
 ```sh
 dotnet build seq-mcp.sln -c Release
-dotnet run --project src/SeqMcp
+dotnet run --project src/SeqMcp -- --help          # CLI (default)
+dotnet run --project src/SeqMcp -- --stdio         # MCP over stdio
+dotnet run --project src/SeqMcp -- --http          # MCP over HTTP
 ```
 
 ## License
