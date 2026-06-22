@@ -67,6 +67,33 @@ claude mcp add --transport http seq http://localhost:5250
 }
 ```
 
+## Claude Desktop extension (.mcpb)
+
+The server is also packaged as a one-click [MCPB](https://github.com/anthropics/mcpb)
+desktop extension. The bundle ships a self-contained Windows executable, so the target
+machine needs neither the .NET runtime nor `seq-mcp` on its `PATH`.
+
+To install it in Claude Desktop:
+
+1. Download `seq-mcp.mcpb` from the [latest release](https://github.com/daniellittledev/seq-mcp/releases/latest).
+2. Open **Settings → Extensions → Advanced settings → Install Extension**.
+3. Select the downloaded `seq-mcp.mcpb`.
+4. When prompted, enter your **Seq server URL** and (optionally) **Seq API key**.
+   These are stored by Claude Desktop and passed to the server as the
+   `SEQ__SERVERURL` / `SEQ__APIKEY` environment variables, so no secrets are baked
+   into the bundle.
+
+### Building the bundle yourself
+
+Requires the .NET SDK and Node.js:
+
+```pwsh
+./build-mcpb.ps1
+```
+
+This publishes the self-contained executable and writes `dist/seq-mcp.mcpb`. Pushing a
+`v*.*.*` tag runs the same build in CI and attaches the `.mcpb` to a GitHub Release.
+
 ## Build from source
 
 ```sh
