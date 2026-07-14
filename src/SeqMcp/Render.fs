@@ -112,3 +112,74 @@ module internal Render =
                 sb.AppendLine(sprintf "… %d more (use a name filter)" (matches.Length - 50)) |> ignore
 
             sb.ToString().TrimEnd()
+
+    /// Render alerts as `Id · Title` lines (with a `· [disabled]` marker),
+    /// filtered by an optional title substring. Mirrors `signals`.
+    let alerts (nameFilter: string) (items: Alert[]) =
+        let matches =
+            if isNull (box items) then
+                [||]
+            elif String.IsNullOrWhiteSpace nameFilter then
+                items
+            else
+                items
+                |> Array.filter (fun a ->
+                    not (isNull a.Title)
+                    && a.Title.IndexOf(nameFilter, StringComparison.OrdinalIgnoreCase) >= 0)
+
+        if matches.Length = 0 then
+            "No alerts."
+        else
+            let sb = StringBuilder()
+
+            for a in Array.truncate 50 matches do
+                let disabled = if a.IsDisabled then " · [disabled]" else ""
+                sb.AppendLine(sprintf "%s · %s%s" a.Id a.Title disabled) |> ignore
+
+            if matches.Length > 50 then
+                sb.AppendLine(sprintf "… %d more (use a name filter)" (matches.Length - 50)) |> ignore
+
+            sb.ToString().TrimEnd()
+
+    /// Render a single alert in full: header, owner/shared, signals, channels.
+    let alertDetail (a: Alert) =
+        let sb = StringBuilder()
+        let disabled = if a.IsDisabled then " · [disabled]" else ""
+        sb.AppendLine(sprintf "%s · %s%s" a.Id a.Title disabled) |> ignore
+
+        let owner = if isNull a.OwnerId then "(none)" else a.OwnerId
+        sb.AppendLine(sprintf "Shared: %b · Owner: %s" a.IsShared owner) |> ignore
+
+        let sigs = if isNull (box a.Signals) then [||] else a.Signals
+
+        if sigs.Length > 0 then
+            sb.AppendLine(sprintf "Signals (%d):" sigs.Length) |> ignore
+
+            for s in sigs do
+                sb.AppendLine(sprintf "  %s" (cell s)) |> ignore
+
+        let channels =
+            if isNull (box a.NotificationChannels) then [||] else a.NotificationChannels
+
+        if channels.Length > 0 then
+            sb.AppendLine(sprintf "Notification channels (%d):" channels.Length) |> ignore
+
+            for c in channels do
+                sb.AppendLine(sprintf "  %s" (cell c)) |> ignore
+
+        sb.ToString().TrimEnd()
+
+    /// Render alert runtime state as `Id · Title · Status · Occurrences · Since`
+    /// lines. `titles` maps alert id → title (from the alert definitions).
+    let alertState (titles: Map<string, string>) (states: AlertState[]) =
+        if isNull (box states) || states.Length = 0 then
+            "No alerts firing."
+        else
+            states
+            |> Array.map (fun s ->
+                let key = if String.IsNullOrWhiteSpace s.AlertId then s.Id else s.AlertId
+                let title = Map.tryFind key titles |> Option.defaultValue key
+                let status = if isNull s.Status then "" else s.Status
+                let since = if isNull s.FirstOccurrence then "" else s.FirstOccurrence
+                sprintf "%s · %s · %s · %d · %s" key title status s.Occurrences since)
+            |> String.concat "\n"
