@@ -65,3 +65,47 @@ type Signal =
 
       [<JsonPropertyName("Description")>]
       Description: string }
+
+/// A configured Seq alert (a named rule that triggers on matching events) from
+/// GET /api/alerts. Signals/NotificationChannels are kept as raw JSON elements
+/// because their element shape is server-defined; they render via Render.cell.
+type Alert =
+    { [<JsonPropertyName("Id")>]
+      Id: string
+
+      [<JsonPropertyName("Title")>]
+      Title: string
+
+      [<JsonPropertyName("IsDisabled")>]
+      IsDisabled: bool
+
+      [<JsonPropertyName("OwnerId")>]
+      OwnerId: string
+
+      [<JsonPropertyName("IsShared")>]
+      IsShared: bool
+
+      [<JsonPropertyName("Signals")>]
+      Signals: JsonElement[]
+
+      [<JsonPropertyName("NotificationChannels")>]
+      NotificationChannels: JsonElement[] }
+
+/// Current runtime state of an alert from GET /api/alertstate: whether it is
+/// firing, how many times, and since when. AlertId is the join key back to Alert;
+/// some Seq versions carry it on the state entity's own Id instead.
+type AlertState =
+    { [<JsonPropertyName("Id")>]
+      Id: string
+
+      [<JsonPropertyName("AlertId")>]
+      AlertId: string
+
+      [<JsonPropertyName("Status")>]
+      Status: string
+
+      [<JsonPropertyName("Occurrences")>]
+      Occurrences: int
+
+      [<JsonPropertyName("FirstOccurrence")>]
+      FirstOccurrence: string }
