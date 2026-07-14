@@ -72,3 +72,35 @@ let listSignals (client: SeqClient) (nameFilter: string) : Task<string> =
         let! signals = client.ListSignalsAsync()
         return Render.signals nameFilter signals
     }
+
+/// List configured alerts as Id · Title lines, optionally filtered by title substring.
+let listAlerts (client: SeqClient) (nameFilter: string) : Task<string> =
+    task {
+        let! alerts = client.ListAlertsAsync()
+        return Render.alerts nameFilter alerts
+    }
+
+/// Full detail for a single alert by its id.
+let getAlert (client: SeqClient) (id: string) : Task<string> =
+    task {
+        let! a = client.GetAlertAsync id
+        return Render.alertDetail a
+    }
+
+/// Current firing state of alerts, joined with alert titles by id. Fetches both
+/// the state and the definitions so opaque state ids render with their titles.
+let alertState (client: SeqClient) : Task<string> =
+    task {
+        let! states = client.AlertStateAsync()
+        let! alerts = client.ListAlertsAsync()
+
+        let titles =
+            if isNull (box alerts) then
+                Map.empty
+            else
+                alerts
+                |> Array.choose (fun a -> if isNull a.Id then None else Some(a.Id, a.Title))
+                |> Map.ofArray
+
+        return Render.alertState titles states
+    }
