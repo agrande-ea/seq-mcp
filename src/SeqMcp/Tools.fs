@@ -57,3 +57,18 @@ type SeqTools(client: SeqClient) =
             [<Description("Optional case-insensitive substring to filter signal titles."); Optional; DefaultParameterValue(null: string)>] nameFilter: string
         ) : Task<string> =
         run (fun () -> Commands.listSignals client nameFilter)
+
+    [<McpServerTool; Description("List configured Seq alerts as Id · Title lines (with a [disabled] marker for disabled alerts). Pass a name filter to narrow a large list; the returned Id can be passed to get_alert for full detail.")>]
+    member _.ListAlerts
+        (
+            [<Description("Optional case-insensitive substring to filter alert titles."); Optional; DefaultParameterValue(null: string)>] nameFilter: string
+        ) : Task<string> =
+        run (fun () -> Commands.listAlerts client nameFilter)
+
+    [<McpServerTool; Description("Get full detail for a single alert by its id (the Id from list_alerts): title, enabled/disabled, owner, shared status, signals, and notification channels.")>]
+    member _.GetAlert([<Description("The alert id, e.g. 'alert-123'")>] id: string) : Task<string> =
+        run (fun () -> Commands.getAlert client id)
+
+    [<McpServerTool; Description("List the current firing state of Seq alerts as Id · Title · Status · Occurrences · Since lines, newest state joined with alert titles. Note: may require an API key with the Project permission.")>]
+    member _.AlertState() : Task<string> =
+        run (fun () -> Commands.alertState client)
