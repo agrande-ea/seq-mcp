@@ -66,9 +66,25 @@ type Signal =
       [<JsonPropertyName("Description")>]
       Description: string }
 
+/// Runtime activity embedded in each alert from GET /api/alerts: the outcome of
+/// the most recent evaluation plus cumulative counts. Readable with a plain read
+/// API key, unlike the /api/alertstate endpoint (which requires Project permission).
+type AlertActivity =
+    { [<JsonPropertyName("LastCheck")>]
+      LastCheck: string
+
+      [<JsonPropertyName("LastCheckTriggered")>]
+      LastCheckTriggered: bool
+
+      [<JsonPropertyName("SuppressedUntil")>]
+      SuppressedUntil: string
+
+      [<JsonPropertyName("TotalOccurrences")>]
+      TotalOccurrences: int }
+
 /// A configured Seq alert (a named rule that triggers on matching events) from
-/// GET /api/alerts. Signals/NotificationChannels are kept as raw JSON elements
-/// because their element shape is server-defined; they render via Render.cell.
+/// GET /api/alerts. SignalExpression/NotificationChannels are kept as raw JSON
+/// elements because their shape is server-defined; they render via Render.cell.
 type Alert =
     { [<JsonPropertyName("Id")>]
       Id: string
@@ -76,36 +92,35 @@ type Alert =
       [<JsonPropertyName("Title")>]
       Title: string
 
+      [<JsonPropertyName("Description")>]
+      Description: string
+
       [<JsonPropertyName("IsDisabled")>]
       IsDisabled: bool
+
+      [<JsonPropertyName("IsProtected")>]
+      IsProtected: bool
 
       [<JsonPropertyName("OwnerId")>]
       OwnerId: string
 
-      [<JsonPropertyName("IsShared")>]
-      IsShared: bool
+      [<JsonPropertyName("Where")>]
+      Where: string
 
-      [<JsonPropertyName("Signals")>]
-      Signals: JsonElement[]
+      [<JsonPropertyName("Having")>]
+      Having: string
+
+      [<JsonPropertyName("TimeGrouping")>]
+      TimeGrouping: string
+
+      [<JsonPropertyName("NotificationLevel")>]
+      NotificationLevel: string
+
+      [<JsonPropertyName("SignalExpression")>]
+      SignalExpression: JsonElement
 
       [<JsonPropertyName("NotificationChannels")>]
-      NotificationChannels: JsonElement[] }
+      NotificationChannels: JsonElement[]
 
-/// Current runtime state of an alert from GET /api/alertstate: whether it is
-/// firing, how many times, and since when. AlertId is the join key back to Alert;
-/// some Seq versions carry it on the state entity's own Id instead.
-type AlertState =
-    { [<JsonPropertyName("Id")>]
-      Id: string
-
-      [<JsonPropertyName("AlertId")>]
-      AlertId: string
-
-      [<JsonPropertyName("Status")>]
-      Status: string
-
-      [<JsonPropertyName("Occurrences")>]
-      Occurrences: int
-
-      [<JsonPropertyName("FirstOccurrence")>]
-      FirstOccurrence: string }
+      [<JsonPropertyName("Activity")>]
+      Activity: AlertActivity }

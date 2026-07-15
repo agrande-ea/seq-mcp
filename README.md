@@ -15,8 +15,8 @@ raw JSON to keep token usage low.
 | `get_event(id)` | Full detail for one event (the `Id` from the list tools): rendered message, exception/stack trace, and all properties. |
 | `list_signals(nameFilter?)` | Saved signals as `Id · Title` lines; the `Id` can scope `seq_query`/`search_events`. Pass a name substring to narrow the list. |
 | `list_alerts(nameFilter?)` | Configured alerts as `Id · Title` lines (with a `[disabled]` marker). Pass a name substring to narrow; the `Id` can be passed to `get_alert`. |
-| `get_alert(id)` | Full detail for one alert: title, enabled/disabled, owner, shared status, signals, and notification channels. |
-| `alert_state()` | Current firing state of alerts as `Id · Title · Status · Occurrences · Since` lines. May require an API key with the `Project` permission. |
+| `get_alert(id)` | Full detail for one alert: title, description, enabled/disabled, protected status, owner, condition (where/having/window/level), notification channels, and recent activity. |
+| `alert_state()` | Alerts currently firing as `Id · Title · Status · Occurrences · Last check` lines, derived from each alert's activity (shows only alerts whose last check triggered or that are suppressed after recently firing). |
 
 ## Install
 

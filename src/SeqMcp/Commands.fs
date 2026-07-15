@@ -87,20 +87,10 @@ let getAlert (client: SeqClient) (id: string) : Task<string> =
         return Render.alertDetail a
     }
 
-/// Current firing state of alerts, joined with alert titles by id. Fetches both
-/// the state and the definitions so opaque state ids render with their titles.
+/// Current firing state of alerts, derived from each alert's embedded Activity
+/// (readable with a plain read key, unlike /api/alertstate which needs Project).
 let alertState (client: SeqClient) : Task<string> =
     task {
-        let! states = client.AlertStateAsync()
         let! alerts = client.ListAlertsAsync()
-
-        let titles =
-            if isNull (box alerts) then
-                Map.empty
-            else
-                alerts
-                |> Array.choose (fun a -> if isNull a.Id then None else Some(a.Id, a.Title))
-                |> Map.ofArray
-
-        return Render.alertState titles states
+        return Render.alertState alerts
     }

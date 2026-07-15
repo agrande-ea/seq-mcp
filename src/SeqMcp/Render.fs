@@ -141,22 +141,32 @@ module internal Render =
 
             sb.ToString().TrimEnd()
 
-    /// Render a single alert in full: header, owner/shared, signals, channels.
+    /// Render a single alert in full: header, metadata, condition, channels, activity.
     let alertDetail (a: Alert) =
         let sb = StringBuilder()
         let disabled = if a.IsDisabled then " · [disabled]" else ""
         sb.AppendLine(sprintf "%s · %s%s" a.Id a.Title disabled) |> ignore
 
+        if not (String.IsNullOrWhiteSpace a.Description) then
+            sb.AppendLine(a.Description.Trim()) |> ignore
+
         let owner = if isNull a.OwnerId then "(none)" else a.OwnerId
-        sb.AppendLine(sprintf "Shared: %b · Owner: %s" a.IsShared owner) |> ignore
+        sb.AppendLine(sprintf "Protected: %b · Owner: %s" a.IsProtected owner) |> ignore
 
-        let sigs = if isNull (box a.Signals) then [||] else a.Signals
+        if not (String.IsNullOrWhiteSpace a.Where) then
+            sb.AppendLine(sprintf "Where: %s" (a.Where.Trim())) |> ignore
 
-        if sigs.Length > 0 then
-            sb.AppendLine(sprintf "Signals (%d):" sigs.Length) |> ignore
+        if not (String.IsNullOrWhiteSpace a.Having) then
+            sb.AppendLine(sprintf "Having: %s" (a.Having.Trim())) |> ignore
 
-            for s in sigs do
-                sb.AppendLine(sprintf "  %s" (cell s)) |> ignore
+        if not (String.IsNullOrWhiteSpace a.TimeGrouping) then
+            sb.AppendLine(sprintf "Window: %s" a.TimeGrouping) |> ignore
+
+        if not (String.IsNullOrWhiteSpace a.NotificationLevel) then
+            sb.AppendLine(sprintf "Level: %s" a.NotificationLevel) |> ignore
+
+        if a.SignalExpression.ValueKind = JsonValueKind.Object then
+            sb.AppendLine(sprintf "Signal: %s" (cell a.SignalExpression)) |> ignore
 
         let channels =
             if isNull (box a.NotificationChannels) then [||] else a.NotificationChannels
@@ -167,19 +177,45 @@ module internal Render =
             for c in channels do
                 sb.AppendLine(sprintf "  %s" (cell c)) |> ignore
 
+        if not (isNull (box a.Activity)) then
+            let act = a.Activity
+            let triggered = if act.LastCheckTriggered then "triggered" else "ok"
+            let lastCheck = if isNull act.LastCheck then "" else act.LastCheck
+
+            sb.AppendLine(sprintf "Activity: %s · last check %s · %d total occurrences" triggered lastCheck act.TotalOccurrences)
+            |> ignore
+
+            if not (String.IsNullOrWhiteSpace act.SuppressedUntil) then
+                sb.AppendLine(sprintf "  suppressed until %s" act.SuppressedUntil) |> ignore
+
         sb.ToString().TrimEnd()
 
-    /// Render alert runtime state as `Id · Title · Status · Occurrences · Since`
-    /// lines. `titles` maps alert id → title (from the alert definitions).
-    let alertState (titles: Map<string, string>) (states: AlertState[]) =
-        if isNull (box states) || states.Length = 0 then
+    /// Render the current firing state of alerts, derived from each alert's embedded
+    /// Activity (readable without Project permission). Lists only alerts whose last
+    /// evaluation triggered or that are currently suppressed after firing, as
+    /// `Id · Title · Status · N occurrences · last check`.
+    let alertState (items: Alert[]) =
+        let isActive (a: Alert) =
+            not (isNull (box a.Activity))
+            && (a.Activity.LastCheckTriggered
+                || not (String.IsNullOrWhiteSpace a.Activity.SuppressedUntil))
+
+        let active = if isNull (box items) then [||] else Array.filter isActive items
+
+        if active.Length = 0 then
             "No alerts firing."
         else
-            states
-            |> Array.map (fun s ->
-                let key = if String.IsNullOrWhiteSpace s.AlertId then s.Id else s.AlertId
-                let title = Map.tryFind key titles |> Option.defaultValue key
-                let status = if isNull s.Status then "" else s.Status
-                let since = if isNull s.FirstOccurrence then "" else s.FirstOccurrence
-                sprintf "%s · %s · %s · %d · %s" key title status s.Occurrences since)
+            active
+            |> Array.map (fun a ->
+                let act = a.Activity
+
+                let status =
+                    if not (String.IsNullOrWhiteSpace act.SuppressedUntil) then
+                        sprintf "suppressed until %s" act.SuppressedUntil
+                    else
+                        "triggered"
+
+                let lastCheck = if isNull act.LastCheck then "" else act.LastCheck
+
+                sprintf "%s · %s · %s · %d occurrences · last check %s" a.Id a.Title status act.TotalOccurrences lastCheck)
             |> String.concat "\n"

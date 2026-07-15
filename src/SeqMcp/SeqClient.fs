@@ -144,10 +144,3 @@ type SeqClient(http: HttpClient) =
             return JsonSerializer.Deserialize<Alert>(body, jsonOptions)
         }
 
-    /// List the current runtime state of alerts (which are firing, and since when).
-    /// May require an API key with the Project permission.
-    member _.AlertStateAsync() : Task<AlertState[]> =
-        task {
-            let! body = send "api/alertstate"
-            return JsonSerializer.Deserialize<AlertState[]>(body, jsonOptions)
-        }

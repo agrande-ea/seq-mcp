@@ -65,10 +65,10 @@ type SeqTools(client: SeqClient) =
         ) : Task<string> =
         run (fun () -> Commands.listAlerts client nameFilter)
 
-    [<McpServerTool; Description("Get full detail for a single alert by its id (the Id from list_alerts): title, enabled/disabled, owner, shared status, signals, and notification channels.")>]
+    [<McpServerTool; Description("Get full detail for a single alert by its id (the Id from list_alerts): title, description, enabled/disabled, protected status, owner, condition (where/having/window/level), notification channels, and recent activity.")>]
     member _.GetAlert([<Description("The alert id, e.g. 'alert-123'")>] id: string) : Task<string> =
         run (fun () -> Commands.getAlert client id)
 
-    [<McpServerTool; Description("List the current firing state of Seq alerts as Id · Title · Status · Occurrences · Since lines, newest state joined with alert titles. Note: may require an API key with the Project permission.")>]
+    [<McpServerTool; Description("List Seq alerts that are currently firing as Id · Title · Status · Occurrences · Last check lines, derived from each alert's activity. Shows only alerts whose last evaluation triggered or that are suppressed after recently firing. Returns 'No alerts firing.' when none are active.")>]
     member _.AlertState() : Task<string> =
         run (fun () -> Commands.alertState client)
