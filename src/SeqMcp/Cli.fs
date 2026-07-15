@@ -60,7 +60,7 @@ let specs =
         args = [ "id" ]
         opts = [] }
       { name = "alert-state"
-        summary = "Current firing state of alerts (Status · Occurrences · Since)."
+        summary = "Alerts currently firing (Status · Occurrences · Last check)."
         args = []
         opts = [] } ]
 

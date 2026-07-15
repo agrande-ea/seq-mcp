@@ -1,6 +1,7 @@
 namespace SeqMcp
 
 open System
+open System.Globalization
 open System.Text
 open System.Text.Json
 
@@ -195,10 +196,17 @@ module internal Render =
     /// evaluation triggered or that are currently suppressed after firing, as
     /// `Id · Title · Status · N occurrences · last check`.
     let alertState (items: Alert[]) =
+        // True only while the suppression window is still in the future; a stale
+        // timestamp from an elapsed window must not read as "currently firing".
+        let suppressedNow (s: string) =
+            not (String.IsNullOrWhiteSpace s)
+            && (match DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal) with
+                | true, until -> until > DateTimeOffset.UtcNow
+                | _ -> false)
+
         let isActive (a: Alert) =
             not (isNull (box a.Activity))
-            && (a.Activity.LastCheckTriggered
-                || not (String.IsNullOrWhiteSpace a.Activity.SuppressedUntil))
+            && (a.Activity.LastCheckTriggered || suppressedNow a.Activity.SuppressedUntil)
 
         let active = if isNull (box items) then [||] else Array.filter isActive items
 
@@ -210,7 +218,7 @@ module internal Render =
                 let act = a.Activity
 
                 let status =
-                    if not (String.IsNullOrWhiteSpace act.SuppressedUntil) then
+                    if suppressedNow act.SuppressedUntil then
                         sprintf "suppressed until %s" act.SuppressedUntil
                     else
                         "triggered"

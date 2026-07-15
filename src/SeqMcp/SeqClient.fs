@@ -143,4 +143,3 @@ type SeqClient(http: HttpClient) =
             let! body = send url
             return JsonSerializer.Deserialize<Alert>(body, jsonOptions)
         }
-
